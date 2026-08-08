@@ -17,15 +17,16 @@ repositories {
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
 
-    // 🗄️ Spring Data JPA (Provides Jakarta Persistence, Hibernate, and JpaRepository)
+    // Spring Data JPA (Provides Jakarta Persistence, Hibernate, and JpaRepository)
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 
-    // 🐘 PostgreSQL JDBC Driver
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+
+    // PostgreSQL JDBC Driver
     runtimeOnly("org.postgresql:postgresql")
 
-    testImplementation(platform("org.junit:junit-bom:5.10.0"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    // Spring Boot Test Starter (Includes Mockito, MockMvc, @WebMvcTest, and JUnit 5)
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
 tasks.test {

@@ -1,11 +1,12 @@
 package com.payment.service;
 
+import com.payment.dto.PaymentRequest;
 import com.payment.entity.PaymentEntity;
-import com.payment.model.Payment;
 import com.payment.model.PaymentStatus;
 import com.payment.repository.PaymentRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -19,29 +20,29 @@ public class PaymentService {
         this.paymentRepository = paymentRepository;
     }
 
-    public String processPayment(Payment payment) {
-        // 1. Sequential check: If record already exists in DB
-        Optional<PaymentEntity> existingPayment = paymentRepository.findById(payment.transactionId());
+    @Transactional
+    public PaymentEntity processPayment(PaymentRequest request) {
+        // 1. Look up existing transaction in PostgreSQL
+        Optional<PaymentEntity> existingPayment = paymentRepository.findById(request.idempotencyKey());
         if (existingPayment.isPresent()) {
-            return "Payment already processed for ID: " + payment.transactionId();
+            return existingPayment.get();
         }
 
-        // 2. Prepare new entity
+        // 2. Map DTO to new Entity
         PaymentEntity newPayment = new PaymentEntity(
-                payment.transactionId(),
-                payment.amount(),
+                request.idempotencyKey(),
+                request.amount(),
                 PaymentStatus.SUCCESS,
                 "USER_101",
                 LocalDateTime.now()
         );
 
-        // 3. Concurrent protection: Catch duplicate primary key insertion
+        // 3. Persist with race-condition fallback
         try {
-            paymentRepository.save(newPayment);
-            return "Payment processed successfully for ID: " + payment.transactionId();
+            return paymentRepository.save(newPayment);
         } catch (DataIntegrityViolationException e) {
-            // Thread A saved it a millisecond ago! Thread B safely returns the idempotent result.
-            return "Payment already processed for ID: " + payment.transactionId();
+            return paymentRepository.findById(request.idempotencyKey())
+                    .orElseThrow(() -> e);
         }
     }
 }

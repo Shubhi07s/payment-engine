@@ -2,6 +2,8 @@ package com.payment.entity;
 
 import com.payment.model.PaymentStatus;
 import jakarta.persistence.*;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -12,7 +14,7 @@ public class PaymentEntity {
     private String transactionId;
 
     @Column(nullable = false)
-    private long amount;
+    private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -27,11 +29,23 @@ public class PaymentEntity {
     // Default constructor required by JPA
     public PaymentEntity() {}
 
-    public PaymentEntity(String transactionId, long amount, PaymentStatus status, String userId, LocalDateTime createdAt) {
+    public PaymentEntity(String transactionId, BigDecimal amount, PaymentStatus status, String userId, LocalDateTime createdAt) {
         this.transactionId = transactionId;
         this.amount = amount;
         this.status = status;
         this.userId = userId;
         this.createdAt = createdAt;
+    }
+
+    public String getTransactionId() {
+        return transactionId;
+    }
+
+    public BigDecimal getAmount() {
+        return amount;
+    }
+
+    public PaymentStatus getStatus() {
+        return status;
     }
 }
