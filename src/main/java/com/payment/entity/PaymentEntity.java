@@ -48,4 +48,12 @@ public class PaymentEntity {
     public PaymentStatus getStatus() {
         return status;
     }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 }
