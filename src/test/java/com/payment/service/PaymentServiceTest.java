@@ -20,7 +20,10 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -35,6 +38,9 @@ class PaymentServiceTest {
     @Mock
     private OutboxRepository outboxRepository;
 
+    @Mock
+    private IdempotencyService idempotencyService;
+
     // Use a real ObjectMapper to handle serialization cleanly
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
@@ -43,36 +49,24 @@ class PaymentServiceTest {
 
     @BeforeEach
     void setUp() {
-        paymentService = new PaymentService(paymentRepository, outboxRepository, objectMapper);
-    }
-
-    @Test
-    void processPayment_whenPaymentAlreadyExists_shouldReturnExistingPayment() {
-        // 1. Arrange (Given)
-        PaymentRequest request = new PaymentRequest("KEY_123", new BigDecimal("100.00"), "USD");
-        PaymentEntity existingPayment = new PaymentEntity(
-                "KEY_123", new BigDecimal("100.00"), PaymentStatus.SUCCESS, "USER_101", LocalDateTime.now()
+        paymentService = new PaymentService(
+                paymentRepository,
+                outboxRepository,
+                objectMapper,
+                idempotencyService
         );
-
-        when(paymentRepository.findById("KEY_123")).thenReturn(Optional.of(existingPayment));
-
-        // 2. Act (When)
-        PaymentEntity result = paymentService.processPayment(request);
-
-        // 3. Assert (Then)
-        assertEquals("KEY_123", result.getTransactionId());
-        verify(paymentRepository, never()).save(any());
-        verify(outboxRepository, never()).save(any());
     }
 
     @Test
-    void processPayment_whenNewPayment_shouldSaveAndReturnPayment() {
+    void processPayment_whenLockAcquiredAndNewPayment_shouldSaveAndReturnPayment() {
         // 1. Arrange (Given)
         PaymentRequest request = new PaymentRequest("KEY_123", new BigDecimal("100.00"), "USD");
         PaymentEntity expectedEntity = new PaymentEntity(
                 "KEY_123", new BigDecimal("100.00"), PaymentStatus.SUCCESS, "USER_101", LocalDateTime.now()
         );
 
+        // Lock acquisition succeeds
+        when(idempotencyService.lock(anyString(), anyLong())).thenReturn(true);
         when(paymentRepository.findById("KEY_123")).thenReturn(Optional.empty());
         when(paymentRepository.save(any(PaymentEntity.class))).thenReturn(expectedEntity);
 
@@ -84,8 +78,26 @@ class PaymentServiceTest {
         assertEquals("KEY_123", result.getTransactionId());
         assertEquals(new BigDecimal("100.00"), result.getAmount());
 
-        // Verify both payment and outbox entries were saved exactly once
+        // Verify lock, payment save, and outbox save occurred 💾
+        verify(idempotencyService, times(1)).lock("lock:payment:KEY_123", 10);
         verify(paymentRepository, times(1)).save(any(PaymentEntity.class));
         verify(outboxRepository, times(1)).save(any(OutboxEntity.class));
+    }
+
+    @Test
+    void processPayment_whenLockFails_shouldThrowExceptionAndNotTouchDatabase() {
+        // 1. Arrange (Given)
+        PaymentRequest request = new PaymentRequest("KEY_123", new BigDecimal("100.00"), "USD");
+
+        // Lock acquisition fails (concurrent request in progress)
+        when(idempotencyService.lock(anyString(), anyLong())).thenReturn(false);
+
+        // 2. Act & 3. Assert
+        assertThrows(IllegalStateException.class, () -> paymentService.processPayment(request));
+
+        // Verify database was NEVER touched 🛡️
+        verify(paymentRepository, never()).findById(anyString());
+        verify(paymentRepository, never()).save(any());
+        verify(outboxRepository, never()).save(any());
     }
 }

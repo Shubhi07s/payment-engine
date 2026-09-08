@@ -6,7 +6,6 @@ import com.payment.dto.PaymentCreatedEvent;
 import com.payment.dto.PaymentRequest;
 import com.payment.entity.OutboxEntity;
 import com.payment.entity.PaymentEntity;
-import com.payment.model.OutboxStatus;
 import com.payment.model.PaymentStatus;
 import com.payment.repository.OutboxRepository;
 import com.payment.repository.PaymentRepository;
@@ -23,24 +22,35 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final OutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
+    private final IdempotencyService idempotencyService;
 
     public PaymentService(PaymentRepository paymentRepository,
                           OutboxRepository outboxRepository,
-                          ObjectMapper objectMapper) {
+                          ObjectMapper objectMapper,
+                          IdempotencyService idempotencyService) {
         this.paymentRepository = paymentRepository;
         this.outboxRepository = outboxRepository;
         this.objectMapper = objectMapper;
+        this.idempotencyService = idempotencyService;
     }
 
     @Transactional
     public PaymentEntity processPayment(PaymentRequest request) {
-        // 1. Double-checked Idempotency Check
+        //  Step 1: Layer 1 Redis Distributed Lock Check
+        String lockKey = "lock:payment:" + request.idempotencyKey();
+        boolean locked = idempotencyService.lock(lockKey, 10); // 10s TTL
+
+        if (!locked) {
+            throw new IllegalStateException("Concurrent payment request already in progress for key: " + request.idempotencyKey());
+        }
+
+        //  Step 2: Layer 2 Check DB for existing completed record
         Optional<PaymentEntity> existingPayment = paymentRepository.findById(request.idempotencyKey());
         if (existingPayment.isPresent()) {
             return existingPayment.get();
         }
 
-        // 2. Create Payment Record
+        //  Step 3: Create Payment Record
         PaymentEntity newPayment = new PaymentEntity(
                 request.idempotencyKey(),
                 request.amount(),
@@ -57,7 +67,7 @@ public class PaymentService {
                     .orElseThrow(() -> e);
         }
 
-        // 3. Create Outbox Event (Atomic write inside same @Transactional block!)
+        //  Step 4: Create Outbox Event
         saveOutboxEvent(savedPayment);
 
         return savedPayment;
