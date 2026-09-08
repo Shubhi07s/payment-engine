@@ -19,6 +19,9 @@ public class OutboxEntity {
     private String aggregateType; // e.g., "PAYMENT" 🏷
 
     @Column(nullable = false)
+    private String aggregateId;
+
+    @Column(nullable = false)
     private String eventType;     // e.g., "PAYMENT_CREATED"
 
     @Column(nullable = false, columnDefinition = "TEXT")
@@ -33,8 +36,9 @@ public class OutboxEntity {
 
     public OutboxEntity() {}
 
-    public OutboxEntity(String aggregateType, String eventType, String payload) {
+    public OutboxEntity(String aggregateType, String aggregateId, String eventType, String payload) {
         this.aggregateType = aggregateType;
+        this.aggregateId = aggregateId;
         this.eventType = eventType;
         this.payload = payload;
         this.status = OutboxStatus.PENDING;
@@ -44,6 +48,10 @@ public class OutboxEntity {
     // Getters for reading event details
     public String getAggregateType() {
         return aggregateType;
+    }
+
+    public String getAggregateId() {
+        return aggregateId;
     }
 
     public String getEventType() {

@@ -22,6 +22,8 @@ dependencies {
 
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
+    implementation ("org.springframework.kafka:spring-kafka")
+
     // PostgreSQL JDBC Driver
     runtimeOnly("org.postgresql:postgresql")
 

@@ -77,6 +77,7 @@ public class PaymentService {
 
             OutboxEntity outboxEntry = new OutboxEntity(
                     "PAYMENT",
+                    payment.getTransactionId(),
                     "PAYMENT_CREATED",
                     jsonPayload
             );
