@@ -56,4 +56,8 @@ public class PaymentEntity {
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
+
+    public void setStatus(PaymentStatus status) {
+        this.status = status;
+    }
 }

@@ -1,6 +1,7 @@
 package com.payment.controller;
 
 import com.payment.dto.PaymentRequest;
+import com.payment.dto.PaymentResponse;
 import com.payment.entity.PaymentEntity;
 import com.payment.service.PaymentService;
 import jakarta.validation.Valid;
@@ -18,8 +19,17 @@ public class PaymentEngineController {
     }
 
     @PostMapping("/process")
-    public ResponseEntity<PaymentEntity> processPayment(@Valid @RequestBody PaymentRequest request) {
-        PaymentEntity response = paymentService.processPayment(request);
+    public ResponseEntity<PaymentResponse> processPayment(@Valid @RequestBody PaymentRequest request) {
+        PaymentEntity entity = paymentService.processPayment(request);
+
+        PaymentResponse response = new PaymentResponse(
+                entity.getTransactionId(),
+                entity.getAmount(),
+                entity.getStatus(),
+                entity.getUserId(),
+                entity.getCreatedAt()
+        );
+
         return ResponseEntity.ok(response);
     }
 }
