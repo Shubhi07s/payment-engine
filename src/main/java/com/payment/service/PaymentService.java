@@ -9,6 +9,7 @@ import com.payment.entity.PaymentEntity;
 import com.payment.model.PaymentStatus;
 import com.payment.repository.OutboxRepository;
 import com.payment.repository.PaymentRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,15 +24,18 @@ public class PaymentService {
     private final OutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
     private final IdempotencyService idempotencyService;
+    private final MeterRegistry meterRegistry;
 
     public PaymentService(PaymentRepository paymentRepository,
                           OutboxRepository outboxRepository,
                           ObjectMapper objectMapper,
-                          IdempotencyService idempotencyService) {
+                          IdempotencyService idempotencyService,
+                          MeterRegistry meterRegistry) {
         this.paymentRepository = paymentRepository;
         this.outboxRepository = outboxRepository;
         this.objectMapper = objectMapper;
         this.idempotencyService = idempotencyService;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional
@@ -47,6 +51,7 @@ public class PaymentService {
         //  Step 2: Layer 2 Check DB for existing completed record
         Optional<PaymentEntity> existingPayment = paymentRepository.findById(request.idempotencyKey());
         if (existingPayment.isPresent()) {
+            meterRegistry.counter("payment.idempotent.total").increment();
             return existingPayment.get();
         }
 
@@ -69,6 +74,8 @@ public class PaymentService {
 
         //  Step 4: Create Outbox Event
         saveOutboxEvent(savedPayment);
+
+        meterRegistry.counter("payment.successful.total").increment();
 
         return savedPayment;
     }

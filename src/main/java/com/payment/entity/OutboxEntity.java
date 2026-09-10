@@ -6,7 +6,7 @@ import com.payment.model.OutboxStatus;
 
 @Entity
 @Table(name = "outbox", indexes = {
-        // 🔍 Index to speed up pending event lookups for our background worker
+        //  Index to speed up pending event lookups for our background worker
         @Index(name = "idx_outbox_status_created", columnList = "status, createdAt")
 })
 public class OutboxEntity {
@@ -16,7 +16,7 @@ public class OutboxEntity {
     private Long id;
 
     @Column(nullable = false)
-    private String aggregateType; // e.g., "PAYMENT" 🏷
+    private String aggregateType; // e.g., "PAYMENT"
 
     @Column(nullable = false)
     private String aggregateId;

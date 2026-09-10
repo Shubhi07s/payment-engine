@@ -8,6 +8,8 @@ import com.payment.entity.PaymentEntity;
 import com.payment.model.PaymentStatus;
 import com.payment.repository.OutboxRepository;
 import com.payment.repository.PaymentRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,19 +43,23 @@ class PaymentServiceTest {
     @Mock
     private IdempotencyService idempotencyService;
 
-    // Use a real ObjectMapper to handle serialization cleanly
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
 
+    private MeterRegistry meterRegistry;
     private PaymentService paymentService;
 
     @BeforeEach
     void setUp() {
+        //  Use real in-memory SimpleMeterRegistry for unit testing
+        meterRegistry = new SimpleMeterRegistry();
+
         paymentService = new PaymentService(
                 paymentRepository,
                 outboxRepository,
                 objectMapper,
-                idempotencyService
+                idempotencyService,
+                meterRegistry
         );
     }
 
@@ -65,7 +71,6 @@ class PaymentServiceTest {
                 "KEY_123", new BigDecimal("100.00"), PaymentStatus.SUCCESS, "USER_101", LocalDateTime.now()
         );
 
-        // Lock acquisition succeeds
         when(idempotencyService.lock(anyString(), anyLong())).thenReturn(true);
         when(paymentRepository.findById("KEY_123")).thenReturn(Optional.empty());
         when(paymentRepository.save(any(PaymentEntity.class))).thenReturn(expectedEntity);
@@ -78,10 +83,35 @@ class PaymentServiceTest {
         assertEquals("KEY_123", result.getTransactionId());
         assertEquals(new BigDecimal("100.00"), result.getAmount());
 
-        // Verify lock, payment save, and outbox save occurred 💾
         verify(idempotencyService, times(1)).lock("lock:payment:KEY_123", 10);
         verify(paymentRepository, times(1)).save(any(PaymentEntity.class));
         verify(outboxRepository, times(1)).save(any(OutboxEntity.class));
+
+        //  Assert successful payment counter incremented
+        assertEquals(1.0, meterRegistry.get("payment.successful.total").counter().count());
+    }
+
+    @Test
+    void processPayment_whenExistingPaymentFound_shouldReturnExistingAndIncrementIdempotentCounter() {
+        // 1. Arrange (Given)
+        PaymentRequest request = new PaymentRequest("KEY_123", new BigDecimal("100.00"), "USD");
+        PaymentEntity existingEntity = new PaymentEntity(
+                "KEY_123", new BigDecimal("100.00"), PaymentStatus.SUCCESS, "USER_101", LocalDateTime.now()
+        );
+
+        when(idempotencyService.lock(anyString(), anyLong())).thenReturn(true);
+        when(paymentRepository.findById("KEY_123")).thenReturn(Optional.of(existingEntity));
+
+        // 2. Act (When)
+        PaymentEntity result = paymentService.processPayment(request);
+
+        // 3. Assert (Then)
+        assertNotNull(result);
+        assertEquals("KEY_123", result.getTransactionId());
+        verify(paymentRepository, never()).save(any());
+
+        // 🔁 Assert idempotent counter incremented instead of successful counter
+        assertEquals(1.0, meterRegistry.get("payment.idempotent.total").counter().count());
     }
 
     @Test
@@ -89,13 +119,11 @@ class PaymentServiceTest {
         // 1. Arrange (Given)
         PaymentRequest request = new PaymentRequest("KEY_123", new BigDecimal("100.00"), "USD");
 
-        // Lock acquisition fails (concurrent request in progress)
         when(idempotencyService.lock(anyString(), anyLong())).thenReturn(false);
 
         // 2. Act & 3. Assert
         assertThrows(IllegalStateException.class, () -> paymentService.processPayment(request));
 
-        // Verify database was NEVER touched 🛡️
         verify(paymentRepository, never()).findById(anyString());
         verify(paymentRepository, never()).save(any());
         verify(outboxRepository, never()).save(any());

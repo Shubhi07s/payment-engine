@@ -36,7 +36,7 @@ class PaymentEngineControllerTest {
     @MockBean
     private PaymentService paymentService;
 
-    // 1. Existing Validation Test (400 Bad Request) 📝
+    // 1. Existing Validation Test (400 Bad Request)
     @Test
     void processPayment_whenAmountIsNegative_shouldReturn400BadRequest() throws Exception {
         String invalidJson = """

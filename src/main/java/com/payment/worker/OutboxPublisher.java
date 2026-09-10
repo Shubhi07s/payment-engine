@@ -21,15 +21,15 @@ public class OutboxPublisher {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    // ⏱️ Runs every 5 seconds (5000 milliseconds)
+    // Runs every 5 seconds (5000 milliseconds)
     @Scheduled(fixedDelay = 5000)
     @Transactional
     public void publishPendingEvents() {
-        // 1. Fetch PENDING events (Microsecond fast via Partial Index! 🔍)
+        // 1. Fetch PENDING events (Microsecond fast via Partial Index! )
         List<OutboxEntity> pendingEvents = outboxRepository.findByStatusOrderByCreatedAtAsc(OutboxStatus.PENDING);
 
         for (OutboxEntity event : pendingEvents) {
-            // 2. Simulate sending payload to Kafka 📩
+            // 2. Simulate sending payload to Kafka
             System.out.println("Publishing to Kafka topic [" + event.getAggregateType() + "]: " + event.getPayload());
             kafkaTemplate.send(event.getAggregateType(), event.getAggregateId(), event.getPayload());
 

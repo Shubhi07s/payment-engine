@@ -23,7 +23,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errors);
     }
 
-    // 2. New Concurrent Lock Exception Handler (409 Conflict) 🔐
+    // 2. New Concurrent Lock Exception Handler (409 Conflict)
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException ex) {
         Map<String, Object> body = Map.of(

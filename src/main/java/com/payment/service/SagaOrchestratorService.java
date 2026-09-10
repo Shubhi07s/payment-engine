@@ -22,7 +22,7 @@ public class SagaOrchestratorService {
             // 1. Advance to PAYMENT_COMPLETED
             sagaStateService.updateStatus(sagaId, SagaStatus.PAYMENT_COMPLETED);
 
-            // 2. Execute Ledger Step 📑
+            // 2. Execute Ledger Step
             boolean ledgerSuccess = executeLedger();
             if (!ledgerSuccess) {
                 triggerCompensation(sagaId, "Ledger failed");
@@ -41,7 +41,7 @@ public class SagaOrchestratorService {
     public void triggerCompensation(String sagaId, String reason) {
         log.warn("Compensating saga {}. Reason: {}", sagaId, reason);
 
-        // Transaction 1: Record COMPENSATING state safely 💾
+        // Transaction 1: Record COMPENSATING state safely
         SagaInstanceEntity saga = sagaStateService.updateStatus(sagaId, SagaStatus.COMPENSATING);
 
         // Network Call: Attempt Refund

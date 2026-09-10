@@ -43,13 +43,13 @@ class OutboxPublisherTest {
         outboxPublisher.publishPendingEvents();
 
         // 3. Assert & Verify (Then)
-        // Verify kafkaTemplate.send was called with topic, key, and payload 📩
+        // Verify kafkaTemplate.send was called with topic, key, and payload
         verify(kafkaTemplate, times(1)).send("PAYMENT", "KEY_123", "{\"amount\":100}");
 
-        // Verify entity status was updated 🟢
+        // Verify entity status was updated
         assertEquals(OutboxStatus.PROCESSED, pendingEvent.getStatus());
 
-        // Verify outboxRepository.save was called once to persist the update 💾
+        // Verify outboxRepository.save was called once to persist the update
         verify(outboxRepository, times(1)).save(pendingEvent);
     }
 }
