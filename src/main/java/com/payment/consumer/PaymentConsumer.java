@@ -7,6 +7,7 @@ import com.payment.entity.PaymentEntity;
 import com.payment.model.PaymentStatus;
 import com.payment.repository.PaymentRepository;
 import com.payment.service.IdempotencyService;
+import com.payment.service.SagaOrchestratorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.TransientDataAccessException;
@@ -25,13 +26,16 @@ public class PaymentConsumer {
     private final PaymentRepository paymentRepository;
     private final IdempotencyService idempotencyService;
     private final ObjectMapper objectMapper;
+    private final SagaOrchestratorService sagaOrchestratorService;
 
     public PaymentConsumer(PaymentRepository paymentRepository,
                            IdempotencyService idempotencyService,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           SagaOrchestratorService sagaOrchestratorService) {
         this.paymentRepository = paymentRepository;
         this.idempotencyService = idempotencyService;
         this.objectMapper = objectMapper;
+        this.sagaOrchestratorService = sagaOrchestratorService;
     }
 
     @RetryableTopic(
@@ -53,11 +57,11 @@ public class PaymentConsumer {
 
         if (!locked) {
             log.warn("Concurrent consumer processing active for key: {}. Skipping.", transactionId);
-            // Throwing an exception forces @RetryableTopic to back off and retry later
-            throw new TransientDataAccessException("Could not acquire consumer processing lock for key: " + transactionId) {};        }
+            throw new TransientDataAccessException("Could not acquire consumer processing lock for key: " + transactionId) {};
+        }
 
         try {
-            // 3. PostgreSQL State Verification
+            // 3. PostgreSQL State Verification (Explicit Generic Type)
             Optional<PaymentEntity> entityOpt = paymentRepository.findById(transactionId);
             if (entityOpt.isEmpty()) {
                 log.error("Payment record not found for transactionId: {}", transactionId);
@@ -70,11 +74,9 @@ public class PaymentConsumer {
                 return;
             }
 
-            // 4. Simulate Processing & Update State
-            log.info("Processing payment for transactionId: {}", transactionId);
-            entity.setStatus(PaymentStatus.SUCCESS);
-            paymentRepository.save(entity);
-            log.info("Successfully processed and updated status to SUCCESS for key: {}", transactionId);
+            // 4. Trigger Saga Orchestrator Workflow
+            log.info("Triggering Saga Orchestrator for transactionId: {}", transactionId);
+            sagaOrchestratorService.executeSagaWorkflow(transactionId);
 
         } finally {
             // 5. Always Release Redis Lock

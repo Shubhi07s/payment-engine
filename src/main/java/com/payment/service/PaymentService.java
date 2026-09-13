@@ -59,7 +59,7 @@ public class PaymentService {
         PaymentEntity newPayment = new PaymentEntity(
                 request.idempotencyKey(),
                 request.amount(),
-                PaymentStatus.SUCCESS,
+                PaymentStatus.PENDING,
                 "USER_101",
                 LocalDateTime.now()
         );

@@ -24,7 +24,7 @@ class OutboxPublisherTest {
     private OutboxRepository outboxRepository;
 
     @Mock
-    private KafkaTemplate<String, String> kafkaTemplate;
+    private KafkaTemplate kafkaTemplate;
 
     @InjectMocks
     private OutboxPublisher outboxPublisher;
@@ -43,8 +43,8 @@ class OutboxPublisherTest {
         outboxPublisher.publishPendingEvents();
 
         // 3. Assert & Verify (Then)
-        // Verify kafkaTemplate.send was called with topic, key, and payload
-        verify(kafkaTemplate, times(1)).send("PAYMENT", "KEY_123", "{\"amount\":100}");
+        // Verify kafkaTemplate.send was called with topic "payment-events", key, and payload
+        verify(kafkaTemplate, times(1)).send("payment-events", "KEY_123", "{\"amount\":100}");
 
         // Verify entity status was updated
         assertEquals(OutboxStatus.PROCESSED, pendingEvent.getStatus());

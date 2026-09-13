@@ -9,19 +9,20 @@ import java.time.LocalDateTime;
 public class SagaInstanceEntity {
 
     @Id
+    @Column(name = "saga_id")
     private String sagaId;
 
-    @Column(nullable = false)
+    @Column(name = "transaction_id", nullable = false)
     private String transactionId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false)
     private SagaStatus status;
 
-    @Column(nullable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
     // Default constructor for JPA
@@ -35,15 +36,21 @@ public class SagaInstanceEntity {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Getters and Setters
+    // Getters
     public String getSagaId() { return sagaId; }
     public String getTransactionId() { return transactionId; }
     public SagaStatus getStatus() { return status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 
+    // Setters
+    public void setSagaId(String sagaId) { this.sagaId = sagaId; }
+    public void setTransactionId(String transactionId) { this.transactionId = transactionId; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
     public void setStatus(SagaStatus status) {
         this.status = status;
-        this.updatedAt = LocalDateTime.now(); // Automatically updates timestamp on state change
+        this.updatedAt = LocalDateTime.now();
     }
 }

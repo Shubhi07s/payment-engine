@@ -2,7 +2,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/payment_db
     username: postgres
-    password: postgrespassword
+    password: password
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -12,7 +12,7 @@ spring:
       hibernate:
         format_sql: true
 
-  # 📩 Kafka Producer Configuration
+  #  Kafka Producer Configuration
   kafka:
     bootstrap-servers: localhost:9092
     producer:

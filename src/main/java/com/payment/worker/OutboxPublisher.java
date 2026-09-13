@@ -31,7 +31,7 @@ public class OutboxPublisher {
         for (OutboxEntity event : pendingEvents) {
             // 2. Simulate sending payload to Kafka
             System.out.println("Publishing to Kafka topic [" + event.getAggregateType() + "]: " + event.getPayload());
-            kafkaTemplate.send(event.getAggregateType(), event.getAggregateId(), event.getPayload());
+            kafkaTemplate.send("payment-events", event.getAggregateId(), event.getPayload());
 
             // 3. Update status so it won't be re-fetched
             event.setStatus(OutboxStatus.PROCESSED);

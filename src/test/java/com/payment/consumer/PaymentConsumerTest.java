@@ -6,6 +6,7 @@ import com.payment.entity.PaymentEntity;
 import com.payment.model.PaymentStatus;
 import com.payment.repository.PaymentRepository;
 import com.payment.service.IdempotencyService;
+import com.payment.service.SagaOrchestratorService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,7 +18,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,6 +32,9 @@ class PaymentConsumerTest {
     @Mock
     private IdempotencyService idempotencyService;
 
+    @Mock
+    private SagaOrchestratorService sagaOrchestratorService;
+
     private ObjectMapper objectMapper;
     private PaymentConsumer paymentConsumer;
 
@@ -39,11 +42,16 @@ class PaymentConsumerTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules();
-        paymentConsumer = new PaymentConsumer(paymentRepository, idempotencyService, objectMapper);
+        paymentConsumer = new PaymentConsumer(
+                paymentRepository,
+                idempotencyService,
+                objectMapper,
+                sagaOrchestratorService
+        );
     }
 
     @Test
-    void consume_shouldProcessPaymentAndUpdateStatusToSuccess_whenPending() throws Exception {
+    void consume_shouldTriggerSagaOrchestrator_whenStatusIsPending() throws Exception {
         PaymentCreatedEvent event = new PaymentCreatedEvent(
                 "KEY_123", "USER_1", new BigDecimal("100.00"), "PENDING", LocalDateTime.now()
         );
@@ -57,8 +65,8 @@ class PaymentConsumerTest {
 
         paymentConsumer.consume(jsonMessage);
 
-        assertEquals(PaymentStatus.SUCCESS, entity.getStatus());
-        verify(paymentRepository).save(entity);
+        // Verify that the consumer hands off control to the Saga Orchestrator
+        verify(sagaOrchestratorService).executeSagaWorkflow("KEY_123");
         verify(idempotencyService).unlock("lock:consumer:KEY_123");
     }
 
@@ -77,7 +85,8 @@ class PaymentConsumerTest {
 
         paymentConsumer.consume(jsonMessage);
 
-        verify(paymentRepository, never()).save(any());
+        // Ensure Saga Orchestrator is never invoked for already processed transactions
+        verify(sagaOrchestratorService, never()).executeSagaWorkflow(any());
         verify(idempotencyService).unlock("lock:consumer:KEY_123");
     }
 
@@ -92,5 +101,6 @@ class PaymentConsumerTest {
 
         assertThrows(TransientDataAccessException.class, () -> paymentConsumer.consume(jsonMessage));
         verify(paymentRepository, never()).findById(any());
+        verify(sagaOrchestratorService, never()).executeSagaWorkflow(any());
     }
 }
